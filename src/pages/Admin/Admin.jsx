@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { LogOut, Printer, Users, AlertCircle, CheckCircle, Wrench, XCircle } from 'lucide-react';
+import { LogOut, Printer, Users, CheckCircle, Wrench, XCircle } from 'lucide-react';
 import './Admin.scss';
 import logoImg from '../../assets/logo.svg';
 
