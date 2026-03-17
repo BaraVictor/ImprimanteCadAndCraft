@@ -91,6 +91,28 @@ const PrinterGrid = () => {
     };
   }, []);
 
+  // Efect care urmărește timpul rezervării active
+  useEffect(() => {
+    // Verificăm dacă utilizatorul are o rezervare în curs chiar acum
+    if (activeUploadId) {
+      const myPrinter = printers.find(p => p.id === activeUploadId);
+      
+      // Dacă imprimanta există și timpul ei a ajuns la 0 (sau mai puțin)
+      if (myPrinter && 
+        myPrinter.status === 'reserving' && 
+        myPrinter.secondsLeft !== undefined && 
+        myPrinter.secondsLeft <= 0) {
+        console.log("⏳ Timpul a expirat! Anulăm rezervarea automat...");
+        
+        // Apelăm exact aceeași funcție pe care o folosește butonul "X"
+        handleCancelReservation(activeUploadId);
+        
+        // Opțional: Poți afișa un mesaj ca să știe de ce i s-a închis fereastra
+        alert("Timpul alocat pentru încărcarea fișierului a expirat. Imprimanta a fost eliberată.");
+      }
+    }
+  }, [printers, activeUploadId]); // Se rulează de fiecare dată când "printers" (cronometrul) se actualizează
+
   const formatTime = (seconds) => {
     if (seconds === null || seconds === undefined) return "--:--";
     const h = Math.floor(seconds / 3600).toString().padStart(2, '0');
@@ -126,6 +148,31 @@ const PrinterGrid = () => {
     } catch (err) {
       console.error(err);
       alert('Eroare de conexiune la blocarea imprimantei.');
+    }
+  };
+
+  // Funcția care anulează rezervarea când apeși pe X
+  const handleCancelReservation = async (printerId) => {
+    // 1. Închidem instantaneu interfața (UX bun, pare că se mișcă super rapid)
+    setActiveUploadId(null);
+    setReservationToken(null);
+    setSelectedFile(null);
+
+    // 2. Trimitem semnalul la server să o deblocheze în baza de date
+    const token = localStorage.getItem('token');
+    try {
+      await fetch('http://localhost:3000/api/queue/cancel', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ printerId })
+      });
+      // Nu trebuie să facem nimic altceva, de îndată ce serverul primește cererea, 
+      // va da update și Socket-ul o va face verde pentru toată lumea automat!
+    } catch (error) {
+      console.error("Eroare la deblocarea imprimantei:", error);
     }
   };
 
@@ -271,8 +318,7 @@ const PrinterGrid = () => {
 
           {/* UPLOAD OVERLAY */}
           <div className={`upload-overlay ${activeUploadId === printer.id ? 'active' : ''}`}>
-            <button className="close-btn" onClick={() => { setActiveUploadId(null); setReservationToken(null); }}><X /></button>
-            <h3>Setup {printer.name}</h3>
+            <button className="close-btn" onClick={() => handleCancelReservation(printer.id)}><X /></button>            <h3>Setup {printer.name}</h3>
             
             <div 
               className="drag-drop-area" 
@@ -291,11 +337,20 @@ const PrinterGrid = () => {
               
               <input 
                 type="file" 
-                accept=".stl,.txt,.jpg"
-                onChange={(e) => setSelectedFile(e.target.files[0])}
-                style={{
-                  position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', opacity: 0, cursor: 'pointer'
-                }}
+                accept=".stl"  
+                onChange={(e) => {
+                const file = e.target.files[0];
+                if (file) {
+                // Dublă verificare în JavaScript
+                  if (!file.name.toLowerCase().endsWith('.stl')) {
+                    alert("Te rugăm să încarci doar fișiere cu extensia .stl!");
+                    e.target.value = ''; // Resetăm input-ul
+                    setSelectedFile(null);
+                    return;
+                  }
+                  setSelectedFile(file);
+                }
+                }} 
               />
             </div>
             
