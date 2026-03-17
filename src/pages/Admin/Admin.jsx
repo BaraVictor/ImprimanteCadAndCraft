@@ -20,7 +20,7 @@ const Admin = () => {
   const fetchPrinters = async () => {
     const token = localStorage.getItem('token');
     try {
-      const res = await fetch('http://localhost:3000/api/admin/printers', {
+      const res = await fetch('http://10.167.130.69:3000/api/admin/printers', {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       const data = await res.json();
@@ -74,7 +74,7 @@ const Admin = () => {
   useEffect(() => {
     fetchPrinters();
 
-    const socket = io('http://localhost:3000');
+    const socket = io('http://10.167.130.69:3000');
     socket.on('printersUpdated', () => {
       fetchPrinters();
     });
@@ -107,7 +107,7 @@ const Admin = () => {
   const handleDownload = (teamId) => {
     const token = localStorage.getItem('token');
     // Deschidem link-ul de redirect de la backend într-un tab nou
-    window.open(`http://localhost:3000/api/admin/download/${teamId}?token=${token}`, '_blank');
+    window.open(`http://10.167.130.69:3000/api/admin/download/${teamId}?token=${token}`, '_blank');
   };
 
   const handleStartPrint = async (printerId) => {
@@ -116,7 +116,7 @@ const Admin = () => {
 
     const token = localStorage.getItem('token');
     try {
-      await fetch('http://localhost:3000/api/admin/assign', {
+      await fetch('http://10.167.130.69:3000/api/admin/assign', {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
@@ -135,7 +135,7 @@ const Admin = () => {
     
     const token = localStorage.getItem('token');
     try {
-      await fetch(`http://localhost:3000/api/admin/complete/${printerId}`, {
+      await fetch(`http://10.167.130.69:3000/api/admin/complete/${printerId}`, {
         method: 'PUT',
         headers: { 'Authorization': `Bearer ${token}` }
       });
@@ -148,7 +148,7 @@ const Admin = () => {
     const newStatus = currentStatus === 'maintenance' ? 'free' : 'maintenance';
     const token = localStorage.getItem('token');
     try {
-      await fetch(`http://localhost:3000/api/admin/printers/${printerId}/log`, {
+      await fetch(`http://10.167.130.69:3000/api/admin/printers/${printerId}/log`, {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',

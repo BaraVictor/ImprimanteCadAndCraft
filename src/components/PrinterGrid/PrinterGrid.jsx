@@ -15,7 +15,7 @@ const PrinterGrid = () => {
   // 1. Funcția care aduce imprimantele din backend
   const fetchPrinters = async () => {
     try {
-      const res = await fetch('http://localhost:3000/api/queue/printers');
+      const res = await fetch('http://10.167.130.69:3000/api/queue/printers');
       const data = await res.json();
       
       // Adaptăm datele din Firebase la formatul pe care îl așteaptă interfața ta
@@ -66,7 +66,7 @@ const PrinterGrid = () => {
     fetchPrinters();
 
     // Ne conectăm la serverul de Sockets
-    const socket = io('http://localhost:3000');
+    const socket = io('http://10.167.130.69:3000');
     
     // Când serverul strigă "printersUpdated", noi facem iar fetch!
     socket.on('printersUpdated', () => {
@@ -127,7 +127,7 @@ const PrinterGrid = () => {
     const token = localStorage.getItem('token');
     
     try {
-      const res = await fetch(`http://localhost:3000/api/queue/lock/${printerId}`, {
+      const res = await fetch(`http://10.167.130.69:3000/api/queue/lock/${printerId}`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`
@@ -161,7 +161,7 @@ const PrinterGrid = () => {
     // 2. Trimitem semnalul la server să o deblocheze în baza de date
     const token = localStorage.getItem('token');
     try {
-      await fetch('http://localhost:3000/api/queue/cancel', {
+      await fetch('http://10.167.130.69:3000/api/queue/cancel', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -194,7 +194,7 @@ const PrinterGrid = () => {
     formData.append('wantsToBePresent', 'true'); // Presupunem că vrea să fie prezent
 
     try {
-      const res = await fetch('http://localhost:3000/api/queue/submit', {
+      const res = await fetch('http://10.167.130.69:3000/api/queue/submit', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`
