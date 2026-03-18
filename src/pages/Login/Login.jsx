@@ -23,7 +23,7 @@ const Login = () => {
 
     try {
       // 1. Încercăm mai întâi să ne logăm ca Participant
-      let res = await fetch('http://10.167.130.69:3000/api/auth/participant-login', {
+      let res = await fetch('http://localhost:3000/api/auth/participant-login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username, password })
@@ -60,7 +60,7 @@ const Login = () => {
 
       // 2. Dacă username-ul nu există la participanți, încercăm la Admin
       if (data.message === "Username incorect.") {
-        const adminRes = await fetch('http://10.167.130.69:3000/api/auth/login', {
+        const adminRes = await fetch('http://localhost:3000/api/auth/login', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ username, password })
@@ -103,7 +103,7 @@ const Login = () => {
     setError('');
 
     try {
-      const res = await fetch('http://10.167.130.69:3000/api/auth/change-password', {
+      const res = await fetch('http://localhost:3000/api/auth/change-password', {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',

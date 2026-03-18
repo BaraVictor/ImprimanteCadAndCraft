@@ -20,7 +20,7 @@ const PrinterGrid = () => {
       const decodedToken = token ? JSON.parse(atob(token.split('.')[1])) : null;
       const myTeamId = decodedToken ? decodedToken.teamId : null;
 
-      const res = await fetch('http://10.167.130.69:3000/api/queue/printers');
+      const res = await fetch('http://localhost:3000/api/queue/printers');
       const data = await res.json();
 
       if (res.status === 401) {
@@ -94,7 +94,7 @@ const PrinterGrid = () => {
     fetchPrinters();
 
     // Ne conectăm la serverul de Sockets
-    const socket = io('http://10.167.130.69:3000');
+    const socket = io('http://localhost:3000');
     
     // Când serverul strigă "printersUpdated", noi facem iar fetch!
     socket.on('printersUpdated', () => {
@@ -155,7 +155,7 @@ const PrinterGrid = () => {
     const token = localStorage.getItem('token');
     
     try {
-      const res = await fetch(`http://10.167.130.69:3000/api/queue/lock/${printerId}`, {
+      const res = await fetch(`http://localhost:3000/api/queue/lock/${printerId}`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`
@@ -201,7 +201,7 @@ const PrinterGrid = () => {
     // 2. Trimitem semnalul la server să o deblocheze în baza de date
     const token = localStorage.getItem('token');
     try {
-      const res = await fetch('http://10.167.130.69:3000/api/queue/cancel', {
+      const res = await fetch('http://localhost:3000/api/queue/cancel', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -246,7 +246,7 @@ const PrinterGrid = () => {
     formData.append('wantsToBePresent', 'true'); // Presupunem că vrea să fie prezent
 
     try {
-      const res = await fetch('http://10.167.130.69:3000/api/queue/submit', {
+      const res = await fetch('http://localhost:3000/api/queue/submit', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`
