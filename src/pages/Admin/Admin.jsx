@@ -24,6 +24,18 @@ const Admin = () => {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       const data = await res.json();
+
+      if (res.status === 401) {
+    // Ștergem token-ul vechi ca să nu mai încerce să se logheze automat
+    localStorage.removeItem('token'); 
+    
+    // Îi dăm o alertă vizuală
+    alert("Sesiune expirată! Te-ai conectat de pe alt dispozitiv. Vei fi redirecționat către Login.");
+    
+    // Îl aruncăm efectiv afară din pagină, înapoi la Login
+    window.location.href = '/login'; 
+    return; // Oprim execuția restului de cod
+  }
       
       // Dacă adminul nu e autorizat, îl dăm afară
       if (res.status === 401 || res.status === 403) {
@@ -116,7 +128,7 @@ const Admin = () => {
 
     const token = localStorage.getItem('token');
     try {
-      await fetch('http://10.167.130.69:3000/api/admin/assign', {
+      const res = await fetch('http://10.167.130.69:3000/api/admin/assign', {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
@@ -124,6 +136,18 @@ const Admin = () => {
         },
         body: JSON.stringify({ printerId, durationInMinutes: parseInt(min) })
       });
+
+      if (res.status === 401) {
+    // Ștergem token-ul vechi ca să nu mai încerce să se logheze automat
+    localStorage.removeItem('token'); 
+    
+    // Îi dăm o alertă vizuală
+    alert("Sesiune expirată! Te-ai conectat de pe alt dispozitiv. Vei fi redirecționat către Login.");
+    
+    // Îl aruncăm efectiv afară din pagină, înapoi la Login
+    window.location.href = '/login'; 
+    return; // Oprim execuția restului de cod
+  }
       // Nu dăm refetch aici, pentru că va veni semnalul prin Socket
     } catch (err) {
       alert("Eroare la pornirea printului.");
@@ -135,10 +159,21 @@ const Admin = () => {
     
     const token = localStorage.getItem('token');
     try {
-      await fetch(`http://10.167.130.69:3000/api/admin/complete/${printerId}`, {
+      const res = await fetch(`http://10.167.130.69:3000/api/admin/complete/${printerId}`, {
         method: 'PUT',
         headers: { 'Authorization': `Bearer ${token}` }
       });
+      if (res.status === 401) {
+    // Ștergem token-ul vechi ca să nu mai încerce să se logheze automat
+    localStorage.removeItem('token'); 
+    
+    // Îi dăm o alertă vizuală
+    alert("Sesiune expirată! Te-ai conectat de pe alt dispozitiv. Vei fi redirecționat către Login.");
+    
+    // Îl aruncăm efectiv afară din pagină, înapoi la Login
+    window.location.href = '/login'; 
+    return; // Oprim execuția restului de cod
+  }
     } catch (err) {
       alert("Eroare la eliberare.");
     }
@@ -148,7 +183,7 @@ const Admin = () => {
     const newStatus = currentStatus === 'maintenance' ? 'free' : 'maintenance';
     const token = localStorage.getItem('token');
     try {
-      await fetch(`http://10.167.130.69:3000/api/admin/printers/${printerId}/log`, {
+      const res = await fetch(`http://10.167.130.69:3000/api/admin/printers/${printerId}/log`, {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
@@ -156,6 +191,17 @@ const Admin = () => {
         },
         body: JSON.stringify({ message: `Status schimbat manual în ${newStatus}`, status: newStatus })
       });
+      if (res.status === 401) {
+    // Ștergem token-ul vechi ca să nu mai încerce să se logheze automat
+    localStorage.removeItem('token'); 
+    
+    // Îi dăm o alertă vizuală
+    alert("Sesiune expirată! Te-ai conectat de pe alt dispozitiv. Vei fi redirecționat către Login.");
+    
+    // Îl aruncăm efectiv afară din pagină, înapoi la Login
+    window.location.href = '/login'; 
+    return; // Oprim execuția restului de cod
+  }
     } catch (err) {
       alert("Eroare la schimbarea statusului.");
     }

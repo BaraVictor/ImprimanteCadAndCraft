@@ -15,14 +15,26 @@ const PrinterGrid = () => {
   // 1. Funcția care aduce imprimantele din backend
   const fetchPrinters = async () => {
     try {
+      const token = localStorage.getItem('token');
+      // Aducem și ID-ul nostru din token pentru a ști cine suntem "noi"
+      const decodedToken = token ? JSON.parse(atob(token.split('.')[1])) : null;
+      const myTeamId = decodedToken ? decodedToken.teamId : null;
+
       const res = await fetch('http://10.167.130.69:3000/api/queue/printers');
       const data = await res.json();
+
+      if (res.status === 401) {
+        localStorage.removeItem('token'); 
+        alert("Sesiune expirată! Te-ai conectat de pe alt dispozitiv. Vei fi redirecționat către Login.");
+        window.location.href = '/login'; 
+        return; 
+      }
       
-      // Adaptăm datele din Firebase la formatul pe care îl așteaptă interfața ta
       const formattedPrinters = data.map(p => {
         let status = 'available';
         let title = 'Disponibilă';
         let secondsLeft = 0;
+        let printingUser = null; // Aici vom salva cine printează
 
         if (p.status === 'reserving') {
           status = 'booking';
@@ -32,11 +44,28 @@ const PrinterGrid = () => {
           title = p.status === 'pending_admin' ? 'Așteaptă Admin' : 'Printare Activă';
           
           if (p.estimatedEndTime) {
-            // Calculăm câte secunde mai sunt până se termină
-            const end = new Date(p.estimatedEndTime).getTime();
+            const endTimeMs = p.estimatedEndTime._seconds 
+                              ? p.estimatedEndTime._seconds * 1000 
+                              : new Date(p.estimatedEndTime).getTime();
+
             const now = new Date().getTime();
-            secondsLeft = Math.max(0, Math.floor((end - now) / 1000));
+          
+            secondsLeft = Math.max(0, Math.floor((endTimeMs - now) / 1000));
           }
+
+          // --- LOGICA NOUĂ PENTRU NUME ECHIPĂ ---
+          if (p.currentTeam === myTeamId) {
+             // Dacă e echipa noastră, nu ne interesează altceva!
+             printingUser = "Echipa ta";
+          } else if (p.teamDetails && p.teamDetails.teamName) {
+             // Dacă e altă echipă ȘI backend-ul ne-a trimis numele
+             printingUser = p.teamDetails.teamName;
+          } else {
+             // Dacă e altă echipă dar backend-ul nu ne-a trimis numele încă
+             printingUser = 'Altă echipă';
+          }
+          // --------------------------------------
+
         } else if (p.status === 'maintenance') {
           status = 'maintenance';
           title = 'Mentenanță';
@@ -48,8 +77,7 @@ const PrinterGrid = () => {
           status: status,
           title: title,
           secondsLeft: secondsLeft,
-          // Dacă ar avea un teamId asociat în Firebase, am putea pune numele echipei la user
-          user: p.status === 'reserving' ? 'În curs...' : null, 
+          user: p.status === 'reserving' ? 'În curs...' : printingUser, // Folosim variabila noastră aici!
           fileName: '' 
         };
       });
@@ -135,6 +163,18 @@ const PrinterGrid = () => {
       });
       const data = await res.json();
 
+      if (res.status === 401) {
+    // Ștergem token-ul vechi ca să nu mai încerce să se logheze automat
+    localStorage.removeItem('token'); 
+    
+    // Îi dăm o alertă vizuală
+    alert("Sesiune expirată! Te-ai conectat de pe alt dispozitiv. Vei fi redirecționat către Login.");
+    
+    // Îl aruncăm efectiv afară din pagină, înapoi la Login
+    window.location.href = '/login'; 
+    return; // Oprim execuția restului de cod
+  }
+
       if (res.ok) {
         // Dacă a reușit să blocheze imprimanta, salvăm token-ul temporar și deschidem fereastra de Upload
         setReservationToken(data.reservationToken);
@@ -161,7 +201,7 @@ const PrinterGrid = () => {
     // 2. Trimitem semnalul la server să o deblocheze în baza de date
     const token = localStorage.getItem('token');
     try {
-      await fetch('http://10.167.130.69:3000/api/queue/cancel', {
+      const res = await fetch('http://10.167.130.69:3000/api/queue/cancel', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -169,6 +209,18 @@ const PrinterGrid = () => {
         },
         body: JSON.stringify({ printerId })
       });
+
+      if (res.status === 401) {
+    // Ștergem token-ul vechi ca să nu mai încerce să se logheze automat
+    localStorage.removeItem('token'); 
+    
+    // Îi dăm o alertă vizuală
+    alert("Sesiune expirată! Te-ai conectat de pe alt dispozitiv. Vei fi redirecționat către Login.");
+    
+    // Îl aruncăm efectiv afară din pagină, înapoi la Login
+    window.location.href = '/login'; 
+    return; // Oprim execuția restului de cod
+  }
       // Nu trebuie să facem nimic altceva, de îndată ce serverul primește cererea, 
       // va da update și Socket-ul o va face verde pentru toată lumea automat!
     } catch (error) {
@@ -202,6 +254,18 @@ const PrinterGrid = () => {
         },
         body: formData
       });
+
+      if (res.status === 401) {
+    // Ștergem token-ul vechi ca să nu mai încerce să se logheze automat
+    localStorage.removeItem('token'); 
+    
+    // Îi dăm o alertă vizuală
+    alert("Sesiune expirată! Te-ai conectat de pe alt dispozitiv. Vei fi redirecționat către Login.");
+    
+    // Îl aruncăm efectiv afară din pagină, înapoi la Login
+    window.location.href = '/login'; 
+    return; // Oprim execuția restului de cod
+  }
 
       const data = await res.json();
 
@@ -289,7 +353,10 @@ const PrinterGrid = () => {
                     <h2 style={{ fontSize: '2rem', margin: '5px 0' }}>{formatTime(printer.secondsLeft)}</h2>
                     <p style={{ opacity: 0.8 }}>Rămas</p>
                     <p style={{ fontWeight: 'bold', marginTop: '10px' }}>{printer.fileName || 'Fișier în lucru'}</p>
-                    <div className="user-badge"><User size={12}/> Echipa ta/Alta</div>
+                    <div className="user-badge" style={{ backgroundColor: printer.user === 'Echipa ta' ? '#28a745' : '#6c757d', color: 'white' }}>
+                      <User size={12} style={{ marginRight: '5px' }}/> 
+                      {printer.user}
+                    </div>
                   </>
                 )}
                 

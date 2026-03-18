@@ -28,6 +28,18 @@ const Login = () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username, password })
       });
+
+      if (res.status === 401) {
+    // Ștergem token-ul vechi ca să nu mai încerce să se logheze automat
+    localStorage.removeItem('token'); 
+    
+    // Îi dăm o alertă vizuală
+    alert("Sesiune expirată! Te-ai conectat de pe alt dispozitiv. Vei fi redirecționat către Login.");
+    
+    // Îl aruncăm efectiv afară din pagină, înapoi la Login
+    window.location.href = '/login'; 
+    return; // Oprim execuția restului de cod
+  }
       let data = await res.json();
 
       if (res.ok) {
@@ -53,6 +65,18 @@ const Login = () => {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ username, password })
         });
+
+        if (adminRes.status === 401) {
+    // Ștergem token-ul vechi ca să nu mai încerce să se logheze automat
+    localStorage.removeItem('token'); 
+    
+    // Îi dăm o alertă vizuală
+    alert("Sesiune expirată! Te-ai conectat de pe alt dispozitiv. Vei fi redirecționat către Login.");
+    
+    // Îl aruncăm efectiv afară din pagină, înapoi la Login
+    window.location.href = '/login'; 
+    return; // Oprim execuția restului de cod
+  }
         const adminData = await adminRes.json();
 
         if (adminRes.ok) {
@@ -87,6 +111,18 @@ const Login = () => {
         },
         body: JSON.stringify({ newPassword })
       });
+
+      if (res.status === 401) {
+    // Ștergem token-ul vechi ca să nu mai încerce să se logheze automat
+    localStorage.removeItem('token'); 
+    
+    // Îi dăm o alertă vizuală
+    alert("Sesiune expirată! Te-ai conectat de pe alt dispozitiv. Vei fi redirecționat către Login.");
+    
+    // Îl aruncăm efectiv afară din pagină, înapoi la Login
+    window.location.href = '/login'; 
+    return; // Oprim execuția restului de cod
+  }
       const data = await res.json();
 
       if (res.ok) {
