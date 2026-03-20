@@ -15,14 +15,48 @@ const PrinterGrid = () => {
   // 1. Funcția care aduce imprimantele din backend
   const fetchPrinters = async () => {
     try {
+      const token = localStorage.getItem('token');
+      // Aducem și ID-ul nostru din token pentru a ști cine suntem "noi"
+      const decodedToken = token ? JSON.parse(atob(token.split('.')[1])) : null;
+      const myTeamId = decodedToken ? decodedToken.teamId : null;
+
       const res = await fetch('http://localhost:3000/api/queue/printers');
       const data = await res.json();
+
+      const savedRes = localStorage.getItem('activeReservation');
+      if (savedRes) {
+        try {
+          const { printerId } = JSON.parse(savedRes);
+          // Căutăm imprimanta în datele proaspete venite de la backend
+          const realPrinter = data.find(p => p.id === printerId);
+          
+          // Dacă imprimanta a devenit liberă ('free') în backend, dar noi o aveam salvată,
+          // înseamnă că timpul a expirat! Ștergem fantoma din browser.
+          if (realPrinter && realPrinter.status !== 'reserving') {
+             console.log("🧹 Backend-ul a anulat rezervarea. Curățăm memoria browserului.");
+             localStorage.removeItem('activeReservation');
+             setActiveUploadId(null);
+             setReservationToken(null);
+             setSelectedFile(null);
+          }
+        } catch (e) {
+          console.error("Eroare la parsarea localStorage", e);
+        }
+      }
+
+
+      if (res.status === 401) {
+        localStorage.removeItem('token'); 
+        alert("Sesiune expirată! Te-ai conectat de pe alt dispozitiv. Vei fi redirecționat către Login.");
+        window.location.href = '/login'; 
+        return; 
+      }
       
-      // Adaptăm datele din Firebase la formatul pe care îl așteaptă interfața ta
       const formattedPrinters = data.map(p => {
         let status = 'available';
         let title = 'Disponibilă';
         let secondsLeft = 0;
+        let printingUser = null; // Aici vom salva cine printează
 
         if (p.status === 'reserving') {
           status = 'booking';
@@ -32,11 +66,28 @@ const PrinterGrid = () => {
           title = p.status === 'pending_admin' ? 'Așteaptă Admin' : 'Printare Activă';
           
           if (p.estimatedEndTime) {
-            // Calculăm câte secunde mai sunt până se termină
-            const end = new Date(p.estimatedEndTime).getTime();
+            const endTimeMs = p.estimatedEndTime._seconds 
+                              ? p.estimatedEndTime._seconds * 1000 
+                              : new Date(p.estimatedEndTime).getTime();
+
             const now = new Date().getTime();
-            secondsLeft = Math.max(0, Math.floor((end - now) / 1000));
+          
+            secondsLeft = Math.max(0, Math.floor((endTimeMs - now) / 1000));
           }
+
+          // --- LOGICA NOUĂ PENTRU NUME ECHIPĂ ---
+          if (p.currentTeam === myTeamId) {
+             // Dacă e echipa noastră, nu ne interesează altceva!
+             printingUser = "Echipa ta";
+          } else if (p.teamDetails && p.teamDetails.teamName) {
+             // Dacă e altă echipă ȘI backend-ul ne-a trimis numele
+             printingUser = p.teamDetails.teamName;
+          } else {
+             // Dacă e altă echipă dar backend-ul nu ne-a trimis numele încă
+             printingUser = 'Altă echipă';
+          }
+          // --------------------------------------
+
         } else if (p.status === 'maintenance') {
           status = 'maintenance';
           title = 'Mentenanță';
@@ -48,8 +99,7 @@ const PrinterGrid = () => {
           status: status,
           title: title,
           secondsLeft: secondsLeft,
-          // Dacă ar avea un teamId asociat în Firebase, am putea pune numele echipei la user
-          user: p.status === 'reserving' ? 'În curs...' : null, 
+          user: p.status === 'reserving' ? 'În curs...' : printingUser, // Folosim variabila noastră aici!
           fileName: '' 
         };
       });
@@ -64,6 +114,17 @@ const PrinterGrid = () => {
   useEffect(() => {
     // Aducem datele la încărcarea paginii
     fetchPrinters();
+
+    const savedRes = localStorage.getItem('activeReservation');
+    if (savedRes) {
+      try {
+        const { printerId, token } = JSON.parse(savedRes);
+        setActiveUploadId(printerId);
+        setReservationToken(token);
+      } catch (e) {
+        console.error("Eroare la citirea rezervării din memorie.");
+      }
+    }
 
     // Ne conectăm la serverul de Sockets
     const socket = io('http://localhost:3000');
@@ -91,6 +152,28 @@ const PrinterGrid = () => {
     };
   }, []);
 
+  // Efect care urmărește timpul rezervării active
+  useEffect(() => {
+    // Verificăm dacă utilizatorul are o rezervare în curs chiar acum
+    if (activeUploadId) {
+      const myPrinter = printers.find(p => p.id === activeUploadId);
+      
+      // Dacă imprimanta există și timpul ei a ajuns la 0 (sau mai puțin)
+      if (myPrinter && 
+        myPrinter.status === 'reserving' && 
+        myPrinter.secondsLeft !== undefined && 
+        myPrinter.secondsLeft <= 0) {
+        console.log("⏳ Timpul a expirat! Anulăm rezervarea automat...");
+        
+        // Apelăm exact aceeași funcție pe care o folosește butonul "X"
+        handleCancelReservation(activeUploadId);
+        
+        // Opțional: Poți afișa un mesaj ca să știe de ce i s-a închis fereastra
+        alert("Timpul alocat pentru încărcarea fișierului a expirat. Imprimanta a fost eliberată.");
+      }
+    }
+  }, [printers, activeUploadId]); // Se rulează de fiecare dată când "printers" (cronometrul) se actualizează
+
   const formatTime = (seconds) => {
     if (seconds === null || seconds === undefined) return "--:--";
     const h = Math.floor(seconds / 3600).toString().padStart(2, '0');
@@ -113,10 +196,28 @@ const PrinterGrid = () => {
       });
       const data = await res.json();
 
+      if (res.status === 401) {
+    // Ștergem token-ul vechi ca să nu mai încerce să se logheze automat
+    localStorage.removeItem('token'); 
+    
+    // Îi dăm o alertă vizuală
+    alert("Sesiune expirată! Te-ai conectat de pe alt dispozitiv. Vei fi redirecționat către Login.");
+    
+    // Îl aruncăm efectiv afară din pagină, înapoi la Login
+    window.location.href = '/login'; 
+    return; // Oprim execuția restului de cod
+  }
+
       if (res.ok) {
         // Dacă a reușit să blocheze imprimanta, salvăm token-ul temporar și deschidem fereastra de Upload
         setReservationToken(data.reservationToken);
         setActiveUploadId(printerId);
+
+        localStorage.setItem('activeReservation', JSON.stringify({
+          printerId: printerId,
+          token: data.reservationToken
+        }));
+
         // Serverul a trimis deja prin Socket semnalul către ceilalți că imprimanta e 'reserving'
       } else {
         // Dacă echipa mai are alta rezervată sau la print, afișăm eroarea
@@ -126,6 +227,45 @@ const PrinterGrid = () => {
     } catch (err) {
       console.error(err);
       alert('Eroare de conexiune la blocarea imprimantei.');
+    }
+  };
+
+  // Funcția care anulează rezervarea când apeși pe X
+  const handleCancelReservation = async (printerId) => {
+    // 1. Închidem instantaneu interfața (UX bun, pare că se mișcă super rapid)
+    setActiveUploadId(null);
+    setReservationToken(null);
+    setSelectedFile(null);
+
+    localStorage.removeItem('activeReservation');
+
+    // 2. Trimitem semnalul la server să o deblocheze în baza de date
+    const token = localStorage.getItem('token');
+    try {
+      const res = await fetch('http://localhost:3000/api/queue/cancel', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ printerId })
+      });
+
+      if (res.status === 401) {
+    // Ștergem token-ul vechi ca să nu mai încerce să se logheze automat
+    localStorage.removeItem('token'); 
+    
+    // Îi dăm o alertă vizuală
+    alert("Sesiune expirată! Te-ai conectat de pe alt dispozitiv. Vei fi redirecționat către Login.");
+    
+    // Îl aruncăm efectiv afară din pagină, înapoi la Login
+    window.location.href = '/login'; 
+    return; // Oprim execuția restului de cod
+  }
+      // Nu trebuie să facem nimic altceva, de îndată ce serverul primește cererea, 
+      // va da update și Socket-ul o va face verde pentru toată lumea automat!
+    } catch (error) {
+      console.error("Eroare la deblocarea imprimantei:", error);
     }
   };
 
@@ -156,6 +296,18 @@ const PrinterGrid = () => {
         body: formData
       });
 
+      if (res.status === 401) {
+    // Ștergem token-ul vechi ca să nu mai încerce să se logheze automat
+    localStorage.removeItem('token'); 
+    
+    // Îi dăm o alertă vizuală
+    alert("Sesiune expirată! Te-ai conectat de pe alt dispozitiv. Vei fi redirecționat către Login.");
+    
+    // Îl aruncăm efectiv afară din pagină, înapoi la Login
+    window.location.href = '/login'; 
+    return; // Oprim execuția restului de cod
+  }
+
       const data = await res.json();
 
       if (res.ok) {
@@ -163,6 +315,10 @@ const PrinterGrid = () => {
         setActiveUploadId(null);
         setSelectedFile(null);
         setReservationToken(null);
+
+
+        localStorage.removeItem('activeReservation');
+
         // Serverul va emite 'printersUpdated' și imprimanta se va face Roșie/Printare Activă
       } else {
         alert("Eroare: " + data.message);
@@ -242,7 +398,10 @@ const PrinterGrid = () => {
                     <h2 style={{ fontSize: '2rem', margin: '5px 0' }}>{formatTime(printer.secondsLeft)}</h2>
                     <p style={{ opacity: 0.8 }}>Rămas</p>
                     <p style={{ fontWeight: 'bold', marginTop: '10px' }}>{printer.fileName || 'Fișier în lucru'}</p>
-                    <div className="user-badge"><User size={12}/> Echipa ta/Alta</div>
+                    <div className="user-badge" style={{ backgroundColor: printer.user === 'Echipa ta' ? '#28a745' : '#6c757d', color: 'white' }}>
+                      <User size={12} style={{ marginRight: '5px' }}/> 
+                      {printer.user}
+                    </div>
                   </>
                 )}
                 
@@ -271,8 +430,7 @@ const PrinterGrid = () => {
 
           {/* UPLOAD OVERLAY */}
           <div className={`upload-overlay ${activeUploadId === printer.id ? 'active' : ''}`}>
-            <button className="close-btn" onClick={() => { setActiveUploadId(null); setReservationToken(null); }}><X /></button>
-            <h3>Setup {printer.name}</h3>
+            <button className="close-btn" onClick={() => handleCancelReservation(printer.id)}><X /></button>            <h3>Setup {printer.name}</h3>
             
             <div 
               className="drag-drop-area" 
@@ -291,11 +449,20 @@ const PrinterGrid = () => {
               
               <input 
                 type="file" 
-                accept=".stl,.txt,.jpg"
-                onChange={(e) => setSelectedFile(e.target.files[0])}
-                style={{
-                  position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', opacity: 0, cursor: 'pointer'
-                }}
+                accept=".stl"  
+                onChange={(e) => {
+                const file = e.target.files[0];
+                if (file) {
+                // Dublă verificare în JavaScript
+                  if (!file.name.toLowerCase().endsWith('.stl')) {
+                    alert("Te rugăm să încarci doar fișiere cu extensia .stl!");
+                    e.target.value = ''; // Resetăm input-ul
+                    setSelectedFile(null);
+                    return;
+                  }
+                  setSelectedFile(file);
+                }
+                }} 
               />
             </div>
             
